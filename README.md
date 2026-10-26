@@ -17,7 +17,8 @@ npm run dev                                            # http://localhost:4000
 cd extension && npm install && cp .env.example .env
 npm run dev                                            # then load build/chrome-mv3-dev via chrome://extensions → Load unpacked
 ```
-After loading, copy the extension ID into `ALLOWED_ORIGINS=chrome-extension://<id>` in `server/.env` and restart the API.
+The manifest key fixes the extension ID to `jbdocjhaconacdjjjogdffomhbfkjnjb`, which is already allowed by `server/.env.example`. If you change the key, update `ALLOWED_ORIGINS` in `server/.env` to match.
+The extension defaults to light appearance; choose Light, Dark, or System in Settings to change it.
 Production: `npm run build` / `npm run package`, host the API behind HTTPS, and set `PLASMO_PUBLIC_API_URL` + `host_permissions` accordingly.
 
 ## Security model

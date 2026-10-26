@@ -4,11 +4,24 @@ import { deriveKeys, encrypt, strength } from "~lib/crypto"
 import { openSession, persist, type Session } from "~lib/vault"
 import { Btn, Input, Msg } from "./ui"
 
-export default function Settings({ s, onBack, onReset }: { s: Session; onBack: () => void; onReset: () => void }) {
+type ThemeMode = "light" | "dark" | "system"
+
+export default function Settings({ s, onBack, onReset, theme, onThemeChange }: {
+  s: Session; onBack: () => void; onReset: () => void; theme: ThemeMode; onThemeChange: (theme: ThemeMode) => void
+}) {
   const [auto, setAuto] = useState(5), [oldPw, setOld] = useState(""), [newPw, setNew] = useState("")
   const [msg, setMsg] = useState(""), [ok, setOk] = useState(false)
   useEffect(() => { chrome.storage.local.get("autoLock").then((r) => setAuto(r.autoLock ?? 5)) }, [])
   const say = (m: string, good = false) => { setMsg(m); setOk(good) }
+  async function changeTheme(value: string) {
+    if (value !== "light" && value !== "dark" && value !== "system") return
+    try {
+      await chrome.storage.local.set({ theme: value })
+      onThemeChange(value)
+    } catch {
+      say("Unable to save the theme setting.")
+    }
+  }
 
   async function change() {
     if (newPw.length < 8 || strength(newPw).bits < 40) return say("New password is too weak (min 8 chars).")
@@ -31,17 +44,22 @@ export default function Settings({ s, onBack, onReset }: { s: Session; onBack: (
   return (
     <div className="p-4">
       <h2 className="mb-2 text-lg font-semibold">Settings</h2>
-      <p className="mb-3 text-xs text-slate-400">Signed in as {s.email}</p>
-      <label className="text-xs text-slate-400">Auto-lock after
-        <select value={auto} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm"
+      <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">Signed in as {s.email}</p>
+      <label className="text-xs text-slate-600 dark:text-slate-400">Appearance
+        <select value={theme} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          onChange={(e) => { void changeTheme(e.target.value) }}>
+          <option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option>
+        </select></label>
+      <label className="text-xs text-slate-600 dark:text-slate-400">Auto-lock after
+        <select value={auto} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           onChange={(e) => { setAuto(+e.target.value); chrome.storage.local.set({ autoLock: +e.target.value }) }}>
           <option value={1}>1 minute</option><option value={5}>5 minutes</option><option value={15}>15 minutes</option><option value={60}>1 hour</option><option value={0}>Until browser closes</option>
         </select></label>
-      <h3 className="mb-1 mt-4 text-xs text-slate-400">Change master password</h3>
+      <h3 className="mb-1 mt-4 text-xs text-slate-600 dark:text-slate-400">Change master password</h3>
       <div className="space-y-2"><Input type="password" placeholder="Current password" value={oldPw} onChange={(e) => setOld(e.target.value)} />
         <Input type="password" placeholder="New password" value={newPw} onChange={(e) => setNew(e.target.value)} />
         <Btn onClick={change}>Change</Btn></div>
-      <h3 className="mb-1 mt-4 text-xs text-slate-400">Backup & danger zone</h3>
+      <h3 className="mb-1 mt-4 text-xs text-slate-600 dark:text-slate-400">Backup & danger zone</h3>
       <div className="flex gap-2"><Btn onClick={exportBackup}>Export encrypted backup</Btn>
         <Btn v="danger" onClick={() => confirm("Erase the local vault on this device? (Server copy is kept.)") && onReset()}>Erase local</Btn></div>
       <Msg ok={ok}>{msg}</Msg><Btn className="mt-2" onClick={onBack}>Back</Btn>

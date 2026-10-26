@@ -28,7 +28,7 @@ export default function EntryForm({ initial, all, onSave, onDelete, onCancel }: 
           <Btn onClick={() => setShow(!show)}>👁</Btn><Btn onClick={() => setGen(true)}>🎲</Btn></div>
       </Field>
       <Meter pw={e.password} />{reused && <Msg>⚠ This password is already used in another entry.</Msg>}
-      <Field label="Notes"><textarea value={e.notes} onChange={set("notes")} rows={2} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm" /></Field>
+      <Field label="Notes"><textarea value={e.notes} onChange={set("notes")} rows={2} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" /></Field>
       <div className="flex gap-2"><Btn v="primary" className="flex-1" onClick={save}>Save</Btn><Btn onClick={onCancel}>Cancel</Btn>
         {onDelete && <Btn v="danger" onClick={() => confirm("Delete this credential?") && onDelete()}>Delete</Btn>}</div>
       <Msg>{err}</Msg>

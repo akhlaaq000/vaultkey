@@ -45,12 +45,12 @@ export default function Vault({ s, synced, onAdd, onEdit, onGen, onSettings, onL
           <div className="mt-1 flex gap-2"><Btn v="primary" onClick={() => { onAdd(pending); clearPending() }}>Save</Btn><Btn onClick={clearPending}>Dismiss</Btn></div>
         </div>
       )}
-      {!items.length && <p className="py-8 text-center text-sm text-slate-400">{s.entries.some((e) => !e.deleted) ? "No matches." : "Vault is empty. Click ＋ to add a credential."}</p>}
+      {!items.length && <p className="py-8 text-center text-sm text-slate-600 dark:text-slate-400">{s.entries.some((e) => !e.deleted) ? "No matches." : "Vault is empty. Click ＋ to add a credential."}</p>}
       {items.map((e, i) => (
         <div key={e.id}>
-          {matches(e) && !matches(items[i - 1] ?? ({ url: "" } as Entry)) && <p className="mb-1 mt-2 text-[11px] text-green-400">● Matches this site</p>}
-          <div className="mb-2 rounded-xl bg-slate-800 p-2.5">
-            <div className="font-semibold">{e.name}</div><div className="break-all text-xs text-slate-400">{e.username}</div>
+          {matches(e) && !matches(items[i - 1] ?? ({ url: "" } as Entry)) && <p className="mb-1 mt-2 text-[11px] text-green-700 dark:text-green-400">● Matches this site</p>}
+          <div className="mb-2 rounded-xl bg-slate-100 p-2.5 dark:bg-slate-800">
+            <div className="font-semibold">{e.name}</div><div className="break-all text-xs text-slate-600 dark:text-slate-400">{e.username}</div>
             <div className="mt-1.5 flex gap-1.5 text-xs">
               <Btn className="!px-2 !py-0.5" onClick={() => fill(e)}>Autofill</Btn>
               <Btn className="!px-2 !py-0.5" onClick={() => copy(e.username, "Username copied")}>User</Btn>
@@ -60,7 +60,7 @@ export default function Vault({ s, synced, onAdd, onEdit, onGen, onSettings, onL
           </div>
         </div>
       ))}
-      <p className="sticky bottom-0 bg-slate-900 pt-1 text-center text-[11px] text-slate-500">{toast || (s.token ? (synced ? "● Synced" : "○ Offline – will sync later") : "○ Local only")}</p>
+      <p className="sticky bottom-0 bg-white pt-1 text-center text-[11px] text-slate-500 dark:bg-slate-900">{toast || (s.token ? (synced ? "● Synced" : "○ Offline – will sync later") : "○ Local only")}</p>
     </div>
   )
 }

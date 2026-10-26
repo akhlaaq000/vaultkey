@@ -49,7 +49,7 @@ export default function Auth({ onDone }: { onDone: (s: Session) => void }) {
   return (
     <div className="p-4" onKeyDown={(e) => e.key === "Enter" && !busy && submit()}>
       <h1 className="text-2xl font-bold">🔐 VaultKey</h1>
-      <p className="mb-3 text-xs text-slate-400">{mode === "register" ? "Create an account. Your master password never leaves this device and can't be recovered." : "Sign in to unlock your vault."}</p>
+      <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">{mode === "register" ? "Create an account. Your master password never leaves this device and can't be recovered." : "Sign in to unlock your vault."}</p>
       <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></Field>
       <Field label="Master password"><Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
       {mode === "register" && <><Meter pw={pw} /><Field label="Confirm master password"><Input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></Field></>}
