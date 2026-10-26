@@ -6,4 +6,5 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
-.plasmo/
+.wxt/
+.output/

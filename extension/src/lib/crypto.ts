@@ -41,8 +41,8 @@ export const importKey = (s: string) => crypto.subtle.importKey("raw", unb64(s),
 // ---------- generator & strength ----------
 function randInt(max: number) {
   const lim = Math.floor(0x100000000 / max) * max, a = new Uint32Array(1)
-  do crypto.getRandomValues(a); while (a[0] >= lim)
-  return a[0] % max
+  do crypto.getRandomValues(a); while (a[0]! >= lim)
+  return a[0]! % max
 }
 export const SETS = { lower: "abcdefghijklmnopqrstuvwxyz", upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ", digits: "0123456789", symbols: "!@#$%^&*()-_=+[]{};:,.?" }
 export type GenOpts = Record<keyof typeof SETS, boolean>

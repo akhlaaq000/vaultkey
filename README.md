@@ -1,9 +1,9 @@
 # VaultKey — zero-knowledge password manager
 
-**Stack:** Plasmo · React 18 · TypeScript · Tailwind CSS (extension) + Node.js/Express/TypeScript (API)
+**Stack:** WXT · React 18 · TypeScript · Tailwind CSS (extension) + Node.js/Express/TypeScript/SQLite (API)
 
 ```
-extension/   Plasmo MV3 extension (popup, background worker, autofill content script)
+extension/   WXT MV3 extension (popup, background worker, autofill content script)
 server/      Express API: auth + opaque encrypted-vault sync
 ```
 
@@ -15,11 +15,13 @@ npm run dev                                            # http://localhost:4000
 
 # 2) Extension
 cd extension && npm install && cp .env.example .env
-npm run dev                                            # then load build/chrome-mv3-dev via chrome://extensions → Load unpacked
+npm run dev                                            # then load .output/chrome-mv3 via chrome://extensions → Load unpacked
 ```
 The manifest key fixes the extension ID to `jbdocjhaconacdjjjogdffomhbfkjnjb`, which is already allowed by `server/.env.example`. If you change the key, update `ALLOWED_ORIGINS` in `server/.env` to match.
 The extension defaults to light appearance; choose Light, Dark, or System in Settings to change it.
-Production: `npm run build` / `npm run package`, host the API behind HTTPS, and set `PLASMO_PUBLIC_API_URL` + `host_permissions` accordingly.
+Production: `npm run build` / `npm run package`, host the API behind HTTPS, and set `WXT_PUBLIC_API_URL` + `host_permissions` accordingly.
+
+The API stores accounts and encrypted vaults in `server/data/vaultkey.sqlite` using Node.js's built-in SQLite support (Node.js 22.13 or newer). No JSON database or migration file is used.
 
 ## Security model
 1. Master password + email → **PBKDF2-SHA256 (600k)** → **HKDF** → two independent values:

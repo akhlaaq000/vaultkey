@@ -1,6 +1,6 @@
 import type { Cipher } from "./types"
 
-const BASE = process.env.PLASMO_PUBLIC_API_URL ?? "http://localhost:4000"
+const BASE = import.meta.env.WXT_PUBLIC_API_URL ?? "http://localhost:4000"
 export class ApiError extends Error { constructor(public status: number, msg: string) { super(msg) } }
 
 async function call(path: string, method: string, body?: unknown, token?: string) {

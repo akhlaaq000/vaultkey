@@ -6,7 +6,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { findByEmail, findById, initDb, mutate } from "./db";
+import { createUser, findByEmail, findById, initDb, updatePassword, updateVault } from "./db";
 
 const SECRET = process.env.JWT_SECRET ?? "";
 if (SECRET.length < 32) throw new Error("JWT_SECRET must be at least 32 characters");
@@ -43,10 +43,9 @@ function requireAuth(req: AuthedReq, res: Response, next: NextFunction) {
 app.post("/api/auth/register", authLimiter, async (req, res) => {
   const p = z.object({ email, authHash }).safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: "Invalid input" });
-  if (findByEmail(p.data.email)) return res.status(409).json({ error: "Account already exists" });
   const salt = crypto.randomBytes(16).toString("hex");
   const user = { id: crypto.randomUUID(), email: p.data.email, salt, hash: scrypt(p.data.authHash, salt), vault: null, version: 0 };
-  await mutate((u) => { u.push(user); });
+  if (!createUser(user)) return res.status(409).json({ error: "Account already exists" });
   res.status(201).json({ token: sign(user.id) });
 });
 
@@ -66,7 +65,8 @@ app.put("/api/auth/password", authLimiter, requireAuth, async (req: AuthedReq, r
   if (!same(scrypt(p.data.oldAuthHash, u.salt), u.hash)) return res.status(401).json({ error: "Wrong current password" });
   if (p.data.version !== u.version) return res.status(409).json({ error: "Vault changed, sync first" });
   const salt = crypto.randomBytes(16).toString("hex");
-  const version = await mutate(() => { u.salt = salt; u.hash = scrypt(p.data.newAuthHash, salt); u.vault = p.data.blob; return ++u.version; });
+  const version = updatePassword(u.id, u.version, salt, scrypt(p.data.newAuthHash, salt), p.data.blob);
+  if (version === null) return res.status(409).json({ error: "Vault changed, sync first" });
   res.json({ version });
 });
 
@@ -80,7 +80,11 @@ app.put("/api/vault", requireAuth, async (req: AuthedReq, res) => {
   if (!p.success) return res.status(400).json({ error: "Invalid input" });
   const u = findById(req.uid!)!;
   if (p.data.version !== u.version) return res.status(409).json({ blob: u.vault, version: u.version });
-  const version = await mutate(() => { u.vault = p.data.blob; return ++u.version; });
+  const version = updateVault(u.id, p.data.version, p.data.blob);
+  if (version === null) {
+    const current = findById(req.uid!)!;
+    return res.status(409).json({ blob: current.vault, version: current.version });
+  }
   res.json({ version });
 });
 
