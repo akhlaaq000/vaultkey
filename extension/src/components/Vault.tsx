@@ -9,8 +9,13 @@ export default function Vault({ s, synced, onAdd, onEdit, onGen, onSettings, onL
   const [q, setQ] = useState(""), [toast, setToast] = useState("")
   const [tab, setTab] = useState<chrome.tabs.Tab>(), [pending, setPending] = useState<Pending | null>(null)
   useEffect(() => {
+    const onStorageChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area === "session" && "pending" in changes) setPending(changes.pending.newValue ?? null)
+    }
+    chrome.storage.onChanged.addListener(onStorageChanged)
     chrome.tabs.query({ active: true, currentWindow: true }).then(([t]) => setTab(t))
     chrome.storage.session.get("pending").then((r) => setPending(r.pending ?? null))
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged)
   }, [])
   const say = (t: string) => { setToast(t); setTimeout(() => setToast(""), 2000) }
   const site = tab?.url ? hostOf(tab.url) : ""
@@ -30,7 +35,11 @@ export default function Vault({ s, synced, onAdd, onEdit, onGen, onSettings, onL
     catch { say("No login form found on this page") }
   }
   const copy = async (t: string, m: string) => { await navigator.clipboard.writeText(t); say(m); setTimeout(() => navigator.clipboard.writeText("").catch(() => {}), 20_000) }
-  const clearPending = () => { chrome.storage.session.remove("pending"); chrome.action.setBadgeText({ text: "" }); setPending(null) }
+  const clearPending = async () => {
+    await chrome.storage.session.remove("pending")
+    await chrome.action.setBadgeText({ text: "" })
+    setPending(null)
+  }
 
   return (
     <div className="p-3">
@@ -42,7 +51,7 @@ export default function Vault({ s, synced, onAdd, onEdit, onGen, onSettings, onL
       {pending && (
         <div className="mb-2 rounded-lg border border-indigo-500 bg-indigo-500/10 p-2 text-xs">
           Save login for <b>{hostOf(pending.url)}</b>?
-          <div className="mt-1 flex gap-2"><Btn v="primary" onClick={() => { onAdd(pending); clearPending() }}>Save</Btn><Btn onClick={clearPending}>Dismiss</Btn></div>
+          <div className="mt-1 flex gap-2"><Btn v="primary" onClick={() => { onAdd(pending); void clearPending() }}>Save</Btn><Btn onClick={() => void clearPending()}>Dismiss</Btn></div>
         </div>
       )}
       {!items.length && <p className="py-8 text-center text-sm text-slate-600 dark:text-slate-400">{s.entries.some((e) => !e.deleted) ? "No matches." : "Vault is empty. Click ＋ to add a credential."}</p>}
