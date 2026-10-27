@@ -13,16 +13,25 @@ export default defineBackground(() => {
     void chrome.storage.session.clear()
   })
 
-  chrome.runtime.onMessage.addListener(async (message, sender) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type !== "vk-capture" || !sender.tab) return
     const { url, username, password } = message.data ?? {}
     if (typeof url !== "string" || typeof username !== "string" || typeof password !== "string" || !password) return
-    await chrome.storage.session.set({ pending: { url, username, password } })
-    await chrome.action.setBadgeText({ text: "+" })
-    try {
-      await chrome.action.openPopup()
-    } catch (error) {
-      console.warn("Could not open the save-login popup; the extension badge will indicate the pending login.", error)
-    }
+    void (async () => {
+      await chrome.storage.session.set({ pending: { url, username, password } })
+      await chrome.action.setBadgeText({ text: "+" })
+      try {
+        await chrome.action.openPopup()
+      } catch (error) {
+        console.warn("Could not open the save-login popup; the extension badge will indicate the pending login.", error)
+      }
+    })().then(
+      () => sendResponse({ ok: true }),
+      (error: unknown) => {
+        console.error("Could not store the submitted login in the pending save prompt.", error)
+        sendResponse({ ok: false })
+      }
+    )
+    return true
   })
 })

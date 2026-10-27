@@ -4,7 +4,11 @@ const session: Record<string, unknown> = {}
 const local: Record<string, unknown> = {}
 let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined
 let startupListener: (() => void) | undefined
-let messageListener: ((message: unknown, sender: { tab?: unknown }) => Promise<void>) | undefined
+let messageListener: ((
+  message: unknown,
+  sender: { tab?: unknown },
+  sendResponse: (response: unknown) => void
+) => boolean | undefined) | undefined
 let autoLockAlarmScheduled = false
 
 const chromeMock = {
@@ -28,6 +32,10 @@ const chromeMock = {
 }
 
 const MIN = 60_000
+const dispatchMessage = (message: unknown, sender: { tab?: unknown }) => new Promise<unknown>((resolve) => {
+  const keepAlive = messageListener?.(message, sender, resolve)
+  if (!keepAlive) resolve(undefined)
+})
 const idleFor = (ms: number) => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date("2026-01-01T00:05:00.000Z"))
@@ -101,7 +109,8 @@ describe("background worker", () => {
 
   it("captures credentials and opens the popup even when locked", async () => {
     const pending = { url: "https://example.test", username: "alice", password: "example-secret" }
-    await messageListener?.({ type: "vk-capture", data: pending }, { tab: { id: 1 } })
+    const response = await dispatchMessage({ type: "vk-capture", data: pending }, { tab: { id: 1 } })
+    expect(response).toEqual({ ok: true })
     expect(session.pending).toEqual(pending)
     expect(chromeMock.action.setBadgeText).toHaveBeenCalledWith({ text: "+" })
     expect(chromeMock.action.openPopup).toHaveBeenCalledOnce()
@@ -111,17 +120,17 @@ describe("background worker", () => {
     chromeMock.action.openPopup.mockRejectedValueOnce(new Error("Popup unavailable"))
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined)
     const pending = { url: "https://example.test", username: "", password: "example-secret" }
-    await messageListener?.({ type: "vk-capture", data: pending }, { tab: { id: 1 } })
+    await dispatchMessage({ type: "vk-capture", data: pending }, { tab: { id: 1 } })
     expect(session.pending).toEqual(pending)
     expect(chromeMock.action.setBadgeText).toHaveBeenCalledWith({ text: "+" })
     expect(warn).toHaveBeenCalledOnce()
   })
 
   it("rejects malformed or unrelated capture messages", async () => {
-    await messageListener?.({ type: "vk-capture", data: { password: "secret" } }, { tab: { id: 1 } })
-    await messageListener?.({ type: "vk-capture", data: { url: "https://x.test", username: "", password: "" } }, { tab: { id: 1 } })
-    await messageListener?.({ type: "other" }, { tab: { id: 1 } })
-    await messageListener?.({ type: "vk-capture", data: { url: "https://x.test", username: "", password: "secret" } }, {})
+    await dispatchMessage({ type: "vk-capture", data: { password: "secret" } }, { tab: { id: 1 } })
+    await dispatchMessage({ type: "vk-capture", data: { url: "https://x.test", username: "", password: "" } }, { tab: { id: 1 } })
+    await dispatchMessage({ type: "other" }, { tab: { id: 1 } })
+    await dispatchMessage({ type: "vk-capture", data: { url: "https://x.test", username: "", password: "secret" } }, {})
     expect(chromeMock.storage.session.set).not.toHaveBeenCalled()
     expect(chromeMock.action.openPopup).not.toHaveBeenCalled()
   })

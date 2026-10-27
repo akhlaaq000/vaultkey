@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 let captureListener: ((message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => void) | undefined
 let runMain: (() => void) | undefined
-const sendMessage = vi.fn()
+const sendMessage = vi.fn(async () => ({ ok: true }))
 const chromeMock = {
   runtime: {
     sendMessage,
@@ -22,8 +22,10 @@ describe("content script login capture and autofill", () => {
   beforeEach(() => {
     document.body.innerHTML = ""
     sendMessage.mockClear()
+    vi.useRealTimers()
   })
 
+  afterEach(() => vi.useRealTimers())
   afterAll(() => vi.unstubAllGlobals())
 
   function addInput(form: HTMLFormElement, type: string, value: string, visible = true) {
@@ -45,6 +47,69 @@ describe("content script login capture and autofill", () => {
       type: "vk-capture",
       data: { url: location.origin, username: "alice@example.test", password: "example-secret" }
     })
+  })
+
+  it("captures credentials after typing pauses without requiring form submission", async () => {
+    vi.useFakeTimers()
+    const form = document.createElement("form")
+    const username = addInput(form, "email", "")
+    const password = addInput(form, "password", "")
+    document.body.append(form)
+    username.value = "alice@example.test"
+    username.dispatchEvent(new Event("input", { bubbles: true }))
+    password.value = "example-secret"
+    password.dispatchEvent(new Event("input", { bubbles: true }))
+
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(sendMessage).toHaveBeenCalledOnce()
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "vk-capture",
+      data: { url: location.origin, username: "alice@example.test", password: "example-secret" }
+    })
+  })
+
+  it("does not capture the same credentials again when the form is submitted", async () => {
+    vi.useFakeTimers()
+    const form = document.createElement("form")
+    addInput(form, "text", "alice", true).name = "username"
+    const password = addInput(form, "password", "example-secret")
+    document.body.append(form)
+    password.dispatchEvent(new Event("input", { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(1000)
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+
+    expect(sendMessage).toHaveBeenCalledOnce()
+  })
+
+  it("finds fixed-position login fields and username fields after the password", () => {
+    const form = document.createElement("form")
+    const password = addInput(form, "password", "example-secret", false)
+    password.autocomplete = "current-password"
+    Object.defineProperty(password, "getClientRects", { value: () => [{ width: 120, height: 24 }] })
+    const username = addInput(form, "text", "alice@example.test", false)
+    username.autocomplete = "username"
+    Object.defineProperty(username, "getClientRects", { value: () => [{ width: 120, height: 24 }] })
+    document.body.append(form)
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "vk-capture",
+      data: { url: location.origin, username: "alice@example.test", password: "example-secret" }
+    })
+  })
+
+  it("captures a login when the page prevents the form's default submission", () => {
+    const form = document.createElement("form")
+    addInput(form, "text", "alice", true).name = "username"
+    addInput(form, "password", "example-secret")
+    form.addEventListener("submit", (event) => event.preventDefault())
+    document.body.append(form)
+    const event = new Event("submit", { bubbles: true, cancelable: true })
+    form.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(sendMessage).toHaveBeenCalledOnce()
   })
 
   it("does not capture empty or hidden password fields", () => {
