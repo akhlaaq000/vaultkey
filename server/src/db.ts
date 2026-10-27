@@ -45,6 +45,11 @@ export async function initDb() {
   `)
 }
 
+export function closeDb() {
+  db?.close()
+  db = undefined
+}
+
 export function findByEmail(email: string): User | undefined {
   return userFromRow(database().prepare("SELECT * FROM users WHERE email = ?").get(email))
 }

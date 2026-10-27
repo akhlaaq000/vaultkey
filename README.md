@@ -23,6 +23,13 @@ Production: `npm run build` / `npm run package`, host the API behind HTTPS, and 
 
 The API stores accounts and encrypted vaults in `server/data/vaultkey.sqlite` using Node.js's built-in SQLite support (Node.js 22.13 or newer). No JSON database or migration file is used.
 
+## Tests and browser builds
+```bash
+cd extension && npm test && npx tsc --noEmit && npm run build && npm run build:firefox
+cd ../server && npm test && npx tsc --noEmit -p tsconfig.test.json && npm run build
+```
+The Firefox build command targets Firefox MV3 (Firefox 140+); Chrome builds target MV3. Firefox metadata declares the account email and authentication-related data categories used by the encrypted sync service. Build validation is not a substitute for interactive browser testing. See [test results](./docs/test-results.md).
+
 ## Security model
 1. Master password + email → **PBKDF2-SHA256 (600k)** → **HKDF** → two independent values:
    `encKey` (AES-256-GCM, stays on device) and `authHash` (sent to server).

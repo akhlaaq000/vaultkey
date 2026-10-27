@@ -6,7 +6,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { createUser, findByEmail, findById, initDb, updatePassword, updateVault } from "./db";
+import { closeDb, createUser, findByEmail, findById, initDb, updatePassword, updateVault } from "./db";
 
 const SECRET = process.env.JWT_SECRET ?? "";
 if (SECRET.length < 32) throw new Error("JWT_SECRET must be at least 32 characters");
@@ -91,4 +91,9 @@ app.put("/api/vault", requireAuth, async (req: AuthedReq, res) => {
 app.get("/api/health", (_q, r) => { r.json({ ok: true }); });
 app.use((_e: unknown, _q: Request, res: Response, _n: NextFunction) => { res.status(500).json({ error: "Server error" }); });
 
-initDb().then(() => app.listen(+(process.env.PORT ?? 4000), () => console.log("VaultKey API on :" + (process.env.PORT ?? 4000))));
+export { app };
+export const ready = initDb().then(() => {
+  if (process.env.VITEST) return;
+  app.listen(+(process.env.PORT ?? 4000), () => console.log("VaultKey API on :" + (process.env.PORT ?? 4000)));
+});
+export { closeDb };

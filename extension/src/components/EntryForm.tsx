@@ -7,7 +7,7 @@ import { Btn, Field, Input, Meter, Msg } from "./ui"
 interface Props { initial: Partial<Entry>; all: Entry[]; onSave: (e: Entry) => void; onDelete?: () => void; onCancel: () => void }
 
 export default function EntryForm({ initial, all, onSave, onDelete, onCancel }: Props) {
-  const [e, setE] = useState({ name: "", url: "", username: "", password: "", notes: "", ...initial })
+  const [e, setE] = useState({ name: hostOf(initial.url ?? ""), url: "", username: "", password: "", notes: "", ...initial })
   const [show, setShow] = useState(false), [gen, setGen] = useState(false), [err, setErr] = useState("")
   const set = (k: keyof Entry) => (ev: { target: { value: string } }) => setE({ ...e, [k]: ev.target.value })
   const reused = e.password && all.some((x) => !x.deleted && x.id !== e.id && x.password === e.password)
