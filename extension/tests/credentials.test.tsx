@@ -28,7 +28,8 @@ const entry = (overrides: Partial<Entry> = {}): Entry => ({
   password: "example-secret", notes: "finance", updated: 1, ...overrides
 })
 const isSavePrompt = (_: string, element?: Element | null) =>
-  element?.tagName === "DIV" && (element.textContent ?? "").startsWith("Save login for")
+  element?.tagName === "DIV" && element.className.includes("bg-indigo-500/10") &&
+  (element.textContent ?? "").startsWith("Save login for")
 
 describe("credential form and vault list", () => {
   beforeEach(() => {
@@ -66,6 +67,12 @@ describe("credential form and vault list", () => {
     }))
   })
 
+  it("warns when a password is already used by another entry", () => {
+    render(<EntryForm initial={{}} all={[entry()]} onSave={vi.fn()} onCancel={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "example-secret" } })
+    expect(screen.getByText(/This password is already used in another entry/)).toBeTruthy()
+  })
+
   it("edits an existing credential without changing its id", () => {
     const onSave = vi.fn()
     const original = entry()
@@ -96,30 +103,70 @@ describe("credential form and vault list", () => {
     const search = screen.getByPlaceholderText("Search vault…")
     for (const term of ["Bank", "bank.example.test", "alice", "finance"]) {
       fireEvent.change(search, { target: { value: term } })
-      expect(screen.getByText("Bank")).toBeTruthy()
+      expect(screen.getByText("alice")).toBeTruthy()
     }
     expect(screen.queryByText("Hidden")).toBeNull()
     fireEvent.change(search, { target: { value: "buyer" } })
-    expect(screen.getByText("Shopping")).toBeTruthy()
-    expect(screen.queryByText("Bank")).toBeNull()
+    expect(screen.getByText("buyer")).toBeTruthy()
+    expect(screen.queryByText("alice")).toBeNull()
     fireEvent.change(search, { target: { value: "orders" } })
-    expect(screen.getByText("Shopping")).toBeTruthy()
+    expect(screen.getByText("buyer")).toBeTruthy()
     fireEvent.change(search, { target: { value: "not found" } })
     expect(screen.getByText("No matches.")).toBeTruthy()
   })
 
-  it("displays, edits, and copies a saved credential", async () => {
+  it("renders a compact credential row with hover edit and copy actions", async () => {
     const original = entry()
     const onEdit = vi.fn()
     render(<Vault s={{ ...session, entries: [original] }} synced onAdd={vi.fn()} onEdit={onEdit} onGen={vi.fn()} onSettings={vi.fn()} onLock={vi.fn()} />)
     await waitFor(() => expect(chromeMock.tabs.query).toHaveBeenCalled())
-    expect(screen.getByText("Bank")).toBeTruthy()
+    expect(screen.queryByText("Bank")).toBeNull()
+    expect(screen.getByText("alice")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Autofill alice" }).textContent).toContain("••••••")
+    expect(screen.getByRole("button", { name: "Edit" }).parentElement?.className).toContain("opacity-0")
+    expect(document.querySelectorAll("[title]")).toHaveLength(0)
+    fireEvent.click(screen.getByRole("button", { name: "Autofill alice" }))
+    await waitFor(() => expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(5, {
+      type: "vk-fill", u: "alice", p: "example-secret"
+    }))
     fireEvent.click(screen.getByRole("button", { name: "Edit" }))
     expect(onEdit).toHaveBeenCalledWith(original)
-    fireEvent.click(screen.getByRole("button", { name: "User" }))
-    fireEvent.click(screen.getByRole("button", { name: "Pass" }))
+    fireEvent.click(screen.getByRole("button", { name: "Copy username" }))
+    fireEvent.click(screen.getByRole("button", { name: "Copy password" }))
     expect(navigator.clipboard.writeText).toHaveBeenNthCalledWith(1, "alice")
     expect(navigator.clipboard.writeText).toHaveBeenNthCalledWith(2, "example-secret")
+  })
+
+  it("keeps copy and edit action columns aligned when a username is missing", async () => {
+    render(<Vault s={{ ...session, entries: [entry(), entry({ id: "no-username", username: "" })] }} synced onAdd={vi.fn()} onEdit={vi.fn()} onGen={vi.fn()} onSettings={vi.fn()} onLock={vi.fn()} />)
+    await waitFor(() => expect(chromeMock.tabs.query).toHaveBeenCalled())
+
+    const rows = screen.getAllByRole("button", { name: "Copy password" }).map((button) => button.closest(".group"))
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row?.children).toHaveLength(4)
+      expect(row?.children[1].getAttribute("class")).toContain("w-7")
+      expect(row?.children[3].getAttribute("class")).toContain("opacity-0")
+    }
+    expect(screen.getAllByRole("button", { name: "Copy username" })).toHaveLength(1)
+    expect(screen.getByRole("button", { name: "Copy username" }).querySelector("svg")?.getAttribute("data-icon")).toBe("user")
+    expect(screen.getAllByRole("button", { name: "Copy password" })[0].querySelector("svg")?.getAttribute("data-icon")).toBe("key")
+  })
+
+  it("shows one matching-domain heading above multiple credential rows", async () => {
+    const entries = [
+      entry(),
+      entry({ id: "second-bank-login", name: "Bank work", username: "work-alice" })
+    ]
+    render(<Vault s={{ ...session, entries }} synced onAdd={vi.fn()} onEdit={vi.fn()} onGen={vi.fn()} onSettings={vi.fn()} onLock={vi.fn()} />)
+    await waitFor(() => expect(chromeMock.tabs.query).toHaveBeenCalled())
+
+    expect(screen.getAllByText("Matches this site")).toHaveLength(1)
+    expect(screen.getByText("bank.example.test")).toBeTruthy()
+    expect(screen.queryByText("Bank")).toBeNull()
+    expect(screen.queryByText("Bank work")).toBeNull()
+    expect(screen.getByText("alice")).toBeTruthy()
+    expect(screen.getByText("work-alice")).toBeTruthy()
   })
 
   it("offers a pending captured login and removes it when saved or dismissed", async () => {
@@ -150,7 +197,7 @@ describe("credential form and vault list", () => {
   it("returns to the locked state when the lock button is clicked", async () => {
     const onLock = vi.fn()
     render(<Vault s={session} synced onAdd={vi.fn()} onEdit={vi.fn()} onGen={vi.fn()} onSettings={vi.fn()} onLock={onLock} />)
-    fireEvent.click(screen.getByTitle("Lock"))
+    fireEvent.click(screen.getByRole("button", { name: "Lock vault" }))
     expect(onLock).toHaveBeenCalledOnce()
   })
 

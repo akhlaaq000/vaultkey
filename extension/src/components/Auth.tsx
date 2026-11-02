@@ -3,7 +3,7 @@ import { ApiError, api } from "~lib/api"
 import { decrypt, deriveKeys, strength } from "~lib/crypto"
 import type { Entry } from "~lib/types"
 import { localEntries, merge, openSession, persist, type Session } from "~lib/vault"
-import { Btn, Field, Input, Meter, Msg } from "./ui"
+import { Btn, Field, Icon, Input, Meter, Msg } from "./ui"
 
 export default function Auth({ onDone }: { onDone: (s: Session) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login")
@@ -48,7 +48,7 @@ export default function Auth({ onDone }: { onDone: (s: Session) => void }) {
 
   return (
     <div className="p-4" onKeyDown={(e) => e.key === "Enter" && !busy && submit()}>
-      <h1 className="text-2xl font-bold">🔐 VaultKey</h1>
+      <h1 className="text-2xl font-bold"><Icon name="lock" className="mr-2 text-indigo-500" />VaultKey</h1>
       <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">{mode === "register" ? "Create an account. Your master password never leaves this device and can't be recovered." : "Sign in to unlock your vault."}</p>
       <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></Field>
       <Field label="Master password"><Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>

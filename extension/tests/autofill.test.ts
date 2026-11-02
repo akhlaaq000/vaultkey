@@ -37,23 +37,31 @@ describe("content script login capture and autofill", () => {
     return input
   }
 
-  it("captures visible username and password on a submitted form", () => {
+  it("captures visible username and password when the login button is clicked", () => {
     const form = document.createElement("form")
     addInput(form, "email", "alice@example.test")
     addInput(form, "password", "example-secret")
+    const button = document.createElement("button")
+    button.type = "submit"
+    button.textContent = "Log in"
+    form.append(button)
     document.body.append(form)
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    button.dispatchEvent(new Event("click", { bubbles: true }))
     expect(sendMessage).toHaveBeenCalledWith({
       type: "vk-capture",
       data: { url: location.origin, username: "alice@example.test", password: "example-secret" }
     })
   })
 
-  it("captures credentials after typing pauses without requiring form submission", async () => {
+  it("does not capture credentials while typing, but captures on the login button click", async () => {
     vi.useFakeTimers()
     const form = document.createElement("form")
     const username = addInput(form, "email", "")
     const password = addInput(form, "password", "")
+    const button = document.createElement("button")
+    button.type = "submit"
+    button.textContent = "Sign in"
+    form.append(button)
     document.body.append(form)
     username.value = "alice@example.test"
     username.dispatchEvent(new Event("input", { bubbles: true }))
@@ -62,6 +70,8 @@ describe("content script login capture and autofill", () => {
 
     await vi.advanceTimersByTimeAsync(1000)
 
+    expect(sendMessage).not.toHaveBeenCalled()
+    button.dispatchEvent(new Event("click", { bubbles: true }))
     expect(sendMessage).toHaveBeenCalledOnce()
     expect(sendMessage).toHaveBeenCalledWith({
       type: "vk-capture",
@@ -74,9 +84,13 @@ describe("content script login capture and autofill", () => {
     const form = document.createElement("form")
     addInput(form, "text", "alice", true).name = "username"
     const password = addInput(form, "password", "example-secret")
+    const button = document.createElement("button")
+    button.type = "submit"
+    form.append(button)
     document.body.append(form)
     password.dispatchEvent(new Event("input", { bubbles: true }))
     await vi.advanceTimersByTimeAsync(1000)
+    button.dispatchEvent(new Event("click", { bubbles: true }))
     form.dispatchEvent(new Event("submit", { bubbles: true }))
 
     expect(sendMessage).toHaveBeenCalledOnce()
@@ -90,8 +104,12 @@ describe("content script login capture and autofill", () => {
     const username = addInput(form, "text", "alice@example.test", false)
     username.autocomplete = "username"
     Object.defineProperty(username, "getClientRects", { value: () => [{ width: 120, height: 24 }] })
+    const button = document.createElement("button")
+    button.type = "button"
+    button.textContent = "Log in"
+    form.append(button)
     document.body.append(form)
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    button.dispatchEvent(new Event("click", { bubbles: true }))
 
     expect(sendMessage).toHaveBeenCalledWith({
       type: "vk-capture",
@@ -103,8 +121,12 @@ describe("content script login capture and autofill", () => {
     const form = document.createElement("form")
     addInput(form, "text", "alice", true).name = "username"
     addInput(form, "password", "example-secret")
+    const button = document.createElement("button")
+    button.type = "submit"
+    form.append(button)
     form.addEventListener("submit", (event) => event.preventDefault())
     document.body.append(form)
+    button.dispatchEvent(new Event("click", { bubbles: true }))
     const event = new Event("submit", { bubbles: true, cancelable: true })
     form.dispatchEvent(event)
 
@@ -134,6 +156,60 @@ describe("content script login capture and autofill", () => {
     expect(username.value).toBe("alice")
     expect(password.value).toBe("example-secret")
     expect(response).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("does not offer to save credentials just filled by the extension", async () => {
+    vi.useFakeTimers()
+    const form = document.createElement("form")
+    addInput(form, "text", "").name = "username"
+    addInput(form, "password", "")
+    document.body.append(form)
+    const response = vi.fn()
+
+    captureListener?.({ type: "vk-fill", u: "alice", p: "example-secret" }, {}, response)
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(response).toHaveBeenCalledWith({ ok: true })
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("captures credentials if the user changes a value after autofill", async () => {
+    vi.useFakeTimers()
+    const form = document.createElement("form")
+    addInput(form, "text", "").name = "username"
+    const password = addInput(form, "password", "")
+    const button = document.createElement("button")
+    button.type = "button"
+    button.textContent = "Sign in"
+    form.append(button)
+    document.body.append(form)
+    captureListener?.({ type: "vk-fill", u: "alice", p: "old-secret" }, {}, vi.fn())
+    password.value = "new-secret"
+    password.dispatchEvent(new Event("input", { bubbles: true }))
+    button.dispatchEvent(new Event("click", { bubbles: true }))
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: "vk-capture",
+      data: { url: location.origin, username: "alice", password: "new-secret" }
+    })
+  })
+
+  it("explains that the page must reload when the extension context was invalidated", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined)
+    sendMessage.mockRejectedValueOnce(new Error("Extension context invalidated."))
+    const form = document.createElement("form")
+    addInput(form, "password", "example-secret")
+    const button = document.createElement("button")
+    button.type = "submit"
+    form.append(button)
+    document.body.append(form)
+    button.dispatchEvent(new Event("click", { bubbles: true }))
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(warn).toHaveBeenCalledWith("VaultKey was updated while this page was open. Reload the page to enable login capture.")
+    warn.mockRestore()
   })
 
   it("does not answer fill requests if no visible password input exists", () => {

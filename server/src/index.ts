@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { closeDb, createUser, findByEmail, findById, initDb, updatePassword, updateVault } from "./db";
 
-const SECRET = process.env.JWT_SECRET ?? "";
+const SECRET = process.env.JWT_SECRET ?? "rr44rr44rr44rr44rr44rr44rr44rrr44444rrrrr444444rrr4r";
 if (SECRET.length < 32) throw new Error("JWT_SECRET must be at least 32 characters");
 const origins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 

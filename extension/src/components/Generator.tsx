@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { generatePassword, strength, type GenOpts } from "~lib/crypto"
-import { Btn, Meter } from "./ui"
+import { Btn, Icon, Meter } from "./ui"
 
 export default function Generator({ onUse, onBack }: { onUse?: (p: string) => void; onBack: () => void }) {
   const [len, setLen] = useState(16)
@@ -13,7 +13,7 @@ export default function Generator({ onUse, onBack }: { onUse?: (p: string) => vo
     <div className="p-4">
       <h2 className="mb-2 text-lg font-semibold">Password generator</h2>
       <div className="flex gap-2"><input readOnly value={pw} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-        <Btn onClick={async () => { await navigator.clipboard.writeText(pw); setCopied(true); setTimeout(() => setCopied(false), 1200) }}>{copied ? "✓" : "Copy"}</Btn></div>
+        <Btn onClick={async () => { await navigator.clipboard.writeText(pw); setCopied(true); setTimeout(() => setCopied(false), 1200) }}>{copied ? <><Icon name="check" /> Copied</> : "Copy"}</Btn></div>
       <Meter pw={pw} /><p className="text-xs text-slate-600 dark:text-slate-400">{pw ? `${s.label} · ~${s.bits} bits` : "Select at least one type"}</p>
       <label className="mt-3 block text-xs text-slate-600 dark:text-slate-400">Length: <b className="text-slate-900 dark:text-slate-100">{len}</b>
         <input type="range" min={8} max={64} value={len} onChange={(e) => setLen(+e.target.value)} className="w-full" /></label>

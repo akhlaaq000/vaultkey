@@ -2,8 +2,8 @@ export default defineContentScript({
   matches: ["https://*/*", "http://*/*"],
   allFrames: true,
   main() {
-    const captureTimers = new WeakMap<HTMLInputElement, number>()
     const lastCapture = new WeakMap<HTMLInputElement, string>()
+    const autofilledValues = new WeakMap<HTMLInputElement, string>()
     const visible = (el: HTMLInputElement) => {
       if (el.type === "hidden" || el.disabled || el.readOnly) return false
       const style = getComputedStyle(el)
@@ -33,6 +33,10 @@ export default defineContentScript({
     async function capture(root: ParentNode, input?: HTMLInputElement) {
         const { password, username } = findFields(root)
         if (!password || (input && input !== password) || !password.value) return
+        const markedFields = [password, username].filter((field): field is HTMLInputElement => !!field && autofilledValues.has(field))
+        const userEditedAutofill = markedFields.some((field) => field.value !== autofilledValues.get(field))
+        if (markedFields.length && !userEditedAutofill) return
+        if (userEditedAutofill) markedFields.forEach((field) => autofilledValues.delete(field))
         const data = { url: location.origin, username: username?.value ?? "", password: password.value }
         const fingerprint = JSON.stringify(data)
         if (lastCapture.get(password) === fingerprint) return
@@ -42,56 +46,40 @@ export default defineContentScript({
           if (!result?.ok && lastCapture.get(password) === fingerprint) lastCapture.delete(password)
         } catch (error) {
           if (lastCapture.get(password) === fingerprint) lastCapture.delete(password)
-          console.warn("Could not send login details to VaultKey.", error)
+          if (error instanceof Error && error.message.includes("Extension context invalidated")) {
+            console.warn("VaultKey was updated while this page was open. Reload the page to enable login capture.")
+          } else {
+            console.warn("Could not send login details to VaultKey.", error)
+          }
         }
     }
-    function scheduleCapture(input: HTMLInputElement, delay = 1000) {
-        const root = input.form ?? document
-        const { password } = findFields(root)
-        if (!password) return
-        const previous = captureTimers.get(password)
-        if (previous !== undefined) window.clearTimeout(previous)
-        captureTimers.set(password, window.setTimeout(() => {
-          captureTimers.delete(password)
-          void capture(root, password)
-        }, delay))
-    }
-
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (message?.type !== "vk-fill") return
       const { password, username } = findFields(document)
       if (!password) return
-      if (username) setValue(username, message.u)
+      if (username) {
+        autofilledValues.set(username, message.u)
+        setValue(username, message.u)
+      }
+      autofilledValues.set(password, message.p)
       setValue(password, message.p)
       sendResponse({ ok: true })
     })
 
-    document.addEventListener("input", (event) => {
-      if (!(event.target instanceof HTMLInputElement) || !visible(event.target)) return
-      const input = event.target
-      if (input.type === "password") {
-        scheduleCapture(input)
-        return
-      }
-      const { password } = findFields(input.form ?? document)
-      if (password?.value && ["text", "email", "tel"].includes(input.type)) scheduleCapture(password)
-    }, true)
-
-    document.addEventListener("change", (event) => {
-      if (!(event.target instanceof HTMLInputElement) || !visible(event.target)) return
-      if (event.target.type === "password") scheduleCapture(event.target, 100)
-    }, true)
-
-    document.addEventListener("focusout", (event) => {
-      if (!(event.target instanceof HTMLInputElement) || event.target.type !== "password") return
-      if (visible(event.target)) scheduleCapture(event.target, 100)
-    }, true)
-
-    document.addEventListener("submit", (event) => {
-      if (!(event.target instanceof HTMLFormElement)) return
-      const form = event.target
-      const { password } = findFields(form)
-      if (password) void capture(form, password)
+    document.addEventListener("click", (event) => {
+      if (!(event.target instanceof Element)) return
+      const control = event.target.closest<HTMLElement>("button, input[type=submit], input[type=image], [role=button]")
+      if (!control || ("disabled" in control && control.disabled)) return
+      const label = `${control.textContent ?? ""} ${control.getAttribute("aria-label") ?? ""} ${control.getAttribute("value") ?? ""}`
+      const isSubmit = control instanceof HTMLButtonElement
+        ? !control.type || control.type === "submit"
+        : control instanceof HTMLInputElement
+          ? ["submit", "image"].includes(control.type)
+          : false
+      if (!isSubmit && !/\b(log ?in|sign ?in|submit)\b/i.test(label)) return
+      const root = control.closest("form") ?? document
+      const { password } = findFields(root)
+      if (password) void capture(root, password)
     }, true)
   }
 })

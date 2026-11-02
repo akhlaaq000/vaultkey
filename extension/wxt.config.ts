@@ -21,14 +21,39 @@ export default defineConfig({
     icons: { 128: "icon.png" },
     host_permissions: ["http://localhost:4000/*", "https://*/*", "http://*/*"],
     permissions: ["storage", "alarms", "activeTab"],
+    content_security_policy: {
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline';"
+    },
     action: { default_title: "VaultKey", default_icon: "icon.png" }
   }),
-  vite: () => ({
+  dev: {
+    server: {
+      port: 3000,
+      strictPort: true
+    }
+  },
+  vite: ({ command }) => ({
     resolve: {
       alias: [{
         find: /^~(.*)$/,
         replacement: `${fileURLToPath(new URL("./src/", import.meta.url))}$1`
       }]
-    }
+    },
+    plugins: command === "serve" ? [{
+      name: "vaultkey-disable-dev-content-script-tab-reloads",
+      enforce: "pre",
+      transform(code) {
+        if (!code.includes("function reloadTabsForContentScript")) return null
+        const reloadCall = "await reloadTabsForContentScript(contentScript);"
+        if (!code.includes(reloadCall)) {
+          throw new Error("WXT's content-script reload implementation changed; verify that dev tab reloads remain disabled.")
+        }
+        // Keep WXT's content-script registrations current without reloading every matching page.
+        return {
+          code: code.replaceAll(reloadCall, ""),
+          map: null
+        }
+      }
+    }] : []
   })
 })

@@ -17,7 +17,7 @@ npm run dev                                            # http://localhost:4000
 cd extension && npm install && cp .env.example .env
 npm run dev                                            # load .output/chrome-mv3-dev via chrome://extensions → Load unpacked
 ```
-The development build is named **VaultKey Password Manager (WXT Dev)** and uses the WXT dev server on port 3000. Remove older **DEV**/Plasmo builds from `chrome://extensions`; those stale builds may try to connect to the retired port 1815.
+The development build is named **VaultKey Password Manager (WXT Dev)** and uses the WXT dev server on port 3000. The port is fixed so the popup and server stay in sync; if startup reports that port 3000 is occupied, stop the other WXT dev server before restarting. Remove older **DEV**/Plasmo builds from `chrome://extensions`; those stale builds may try to connect to the retired port 1815. Autofill works on HTTP(S) sites in development and production. Development content-script changes take effect after manually refreshing the page.
 The manifest key fixes the extension ID to `jbdocjhaconacdjjjogdffomhbfkjnjb`, which is already allowed by `server/.env.example`. If you change the key, update `ALLOWED_ORIGINS` in `server/.env` to match.
 The extension defaults to light appearance; choose Light, Dark, or System in Settings to change it.
 Production: `npm run build` / `npm run package`, host the API behind HTTPS, and set `WXT_PUBLIC_API_URL` + `host_permissions` accordingly.
